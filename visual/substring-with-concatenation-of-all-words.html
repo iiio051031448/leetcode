@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>滑动窗口算法 - 深度调试可视化</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .code-font { font-family: 'Fira Code', monospace; }
+        .line-active { background-color: #1e293b; border-left: 4px solid #3b82f6; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.2); }
+        .char-box { width: 28px; height: 36px; border: 1px solid #334155; display: inline-flex; align-items: center; justify-content: center; font-family: monospace; flex-shrink: 0; }
+        .word-border-right { border-right: 2px solid #64748b; }
+        .in-window { background-color: rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
+        .overflow-active { background-color: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #fca5a5; }
+        .match-active { background-color: rgba(34, 197, 94, 0.2); border-color: #22c55e; }
+        .pointer-arrow { position: absolute; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 20; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="p-4 h-screen flex flex-col">
+
+    <!-- 顶部控制面板 -->
+    <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl shadow-2xl flex items-center justify-between mb-4">
+        <div class="flex space-x-6">
+            <div class="flex flex-col">
+                <label class="text-[10px] text-slate-500 font-bold uppercase mb-1">主字符串 S</label>
+                <input id="inputS" type="text" class="bg-slate-900 border border-slate-600 px-3 py-1 rounded text-sm w-80 focus:border-blue-500 outline-none" value="wordgoodgoodgoodbestword">
+            </div>
+            <div class="flex flex-col">
+                <label class="text-[10px] text-slate-500 font-bold uppercase mb-1">单词表 Words</label>
+                <input id="inputWords" type="text" class="bg-slate-900 border border-slate-600 px-3 py-1 rounded text-sm w-64 focus:border-blue-500 outline-none" value="word,good,best,word">
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="reset()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition">重置</button>
+            <button onclick="prev()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition text-blue-400">◀ 上一步</button>
+            <button id="playBtn" onclick="togglePlay()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg text-sm font-bold min-w-[100px]">播放</button>
+            <button onclick="next()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition text-blue-400">下一步 ▶</button>
+        </div>
+    </div>
+
+    <div class="flex-1 grid grid-cols-12 gap-4 min-h-0">
+        <!-- 左侧：代码区 -->
+        <div class="col-span-4 bg-slate-800 rounded-xl border border-slate-700 flex flex-col shadow-xl overflow-hidden">
+            <div class="bg-slate-700/50 px-4 py-2 text-xs font-bold text-slate-400 flex justify-between">
+                <span>SLIDING_WINDOW.CPP</span>
+                <span id="stepProgress" class="text-blue-400 font-mono">STEP 0/0</span>
+            </div>
+            <div id="codeBlock" class="p-4 code-font text-[13px] leading-6 text-slate-400 overflow-y-auto flex-1">
+                <div id="line-0" class="px-2">for (int i = 0; i < len; ++i) {</div>
+                <div id="line-1" class="px-2">&nbsp;&nbsp;int left = i, right = i, count = 0;</div>
+                <div id="line-2" class="px-2">&nbsp;&nbsp;while (right + len <= n) {</div>
+                <div id="line-3" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;string w = s.substr(right, len);</div>
+                <div id="line-4" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;right += len;</div>
+                <div id="line-5" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;if (counts.count(w)) {</div>
+                <div id="line-6" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;window[w]++; count++;</div>
+                <div id="line-7" class="px-2 transition-colors">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (window[w] > counts[w]) {</div>
+                <div id="line-8" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;window[s.substr(left, len)]--;</div>
+                <div id="line-9" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count--; left += len;</div>
+                <div id="line-10" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</div>
+                <div id="line-11" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (count == num) res.push_back(left);</div>
+                <div id="line-12" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;} else {</div>
+                <div id="line-13" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;window.clear(); count = 0; left = right;</div>
+                <div id="line-14" class="px-2">&nbsp;&nbsp;&nbsp;&nbsp;}</div>
+                <div id="line-15" class="px-2">&nbsp;&nbsp;}</div>
+                <div id="line-16" class="px-2">}</div>
+            </div>
+        </div>
+
+        <!-- 右侧：可视化核心 -->
+        <div class="col-span-8 flex flex-col space-y-4 min-h-0">
+            <!-- 字符串磁带 -->
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-6 shadow-xl">
+                <h3 class="text-[10px] font-bold text-slate-500 uppercase mb-6">String Tape Visualizer</h3>
+                <div class="relative pt-10 pb-10">
+                    <div id="tapeContainer" class="flex overflow-x-auto pb-4 scrollbar-hide relative border-b border-slate-700">
+                        <div id="charTape" class="flex"></div>
+                    </div>
+                    <!-- Left Pointer -->
+                    <div id="ptrLeft" class="pointer-arrow flex flex-col items-center" style="bottom: 70px;">
+                        <div class="text-[10px] font-bold text-red-500 bg-slate-900 px-1">LEFT</div>
+                        <div class="text-red-500 text-xs">▼</div>
+                    </div>
+                    <!-- Right Pointer -->
+                    <div id="ptrRight" class="pointer-arrow flex flex-col items-center" style="bottom: 70px;">
+                        <div class="text-[10px] font-bold text-emerald-400 bg-slate-900 px-1">RIGHT</div>
+                        <div class="text-emerald-400 text-xs">▼</div>
+                    </div>
+                </div>
+                <div id="statusText" class="text-center text-sm font-medium text-blue-400 italic">等待开始...</div>
+            </div>
+
+            <!-- 数据监视器 -->
+            <div class="grid grid-cols-12 gap-4 flex-1 min-h-0">
+                <!-- 判定面板 -->
+                <div class="col-span-5 bg-slate-800 rounded-xl border border-slate-700 p-4 flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase mb-4">判定中心 (Condition)</h3>
+                    <div class="flex-1 flex flex-col items-center justify-center space-y-4">
+                        <div id="logicDisplay" class="flex items-center space-x-4 bg-slate-900 p-6 rounded-2xl border-2 border-slate-700 transition-all duration-300">
+                            <div class="text-center">
+                                <div class="text-[10px] text-slate-500 mb-1">WINDOW[W]</div>
+                                <div id="vWin" class="text-3xl font-mono font-bold">-</div>
+                            </div>
+                            <div class="text-2xl text-slate-600 font-bold">></div>
+                            <div class="text-center">
+                                <div class="text-[10px] text-slate-500 mb-1">COUNTS[W]</div>
+                                <div id="vNeed" class="text-3xl font-mono font-bold">-</div>
+                            </div>
+                        </div>
+                        <div id="vResult" class="text-sm font-bold tracking-widest uppercase py-1 px-4 rounded-full border border-slate-600 text-slate-500">
+                            WAITING
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 变量监控 -->
+                <div class="col-span-7 bg-slate-800 rounded-xl border border-slate-700 p-4 flex flex-col">
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase mb-2">监视窗口 (Watch)</h3>
+                    <div class="grid grid-cols-2 gap-4 text-xs font-mono">
+                        <div class="bg-slate-900 p-3 rounded border border-slate-700">
+                            <div class="text-slate-500 mb-1">Current Word (w)</div>
+                            <div id="vW" class="text-emerald-400 text-lg font-bold">"-"</div>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded border border-slate-700">
+                            <div class="text-slate-500 mb-1">Matches (count)</div>
+                            <div id="vCount" class="text-blue-400 text-lg font-bold">0 / 0</div>
+                        </div>
+                        <div class="col-span-2 bg-slate-900 p-3 rounded border border-slate-700 overflow-y-auto max-h-32">
+                            <div class="text-slate-500 mb-2">Hash Map Contrast</div>
+                            <div id="mapContrast" class="space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部：结果集 -->
+    <div class="mt-4 bg-slate-800 border border-slate-700 p-3 rounded-xl flex items-center space-x-4 shadow-xl">
+        <span class="text-[10px] font-bold text-slate-500 uppercase">Results Found (res):</span>
+        <div id="finalRes" class="text-blue-400 font-mono font-bold text-lg">[]</div>
+    </div>
+
+    <script>
+        let states = [];
+        let cur = 0;
+        let timer = null;
+
+        function generateStates() {
+            const s = document.getElementById('inputS').value;
+            const wordsStr = document.getElementById('inputWords').value;
+            const words = wordsStr.split(',').map(x => x.trim()).filter(x => x.length > 0);
+            if(words.length === 0) return [];
+            
+            const n = s.length, num = words.length, len = words[0].length;
+            const history = [];
+            const counts = {};
+            for (let w of words) counts[w] = (counts[w] || 0) + 1;
+
+            let res = [];
+            for (let i = 0; i < len; i++) {
+                let left = i, right = i, count = 0;
+                let window = {};
+                history.push({ line: 1, i, left, right, window: {...window}, count, res: [...res], msg: `进入偏移组 i=${i}` });
+
+                while (right + len <= n) {
+                    history.push({ line: 2, i, left, right, window: {...window}, count, res: [...res], msg: `判断：Right指针未越界` });
+                    let w = s.substr(right, len);
+                    history.push({ line: 3, i, left, right, window: {...window}, count, res: [...res], w, msg: `切出单词: "${w}"` });
+                    right += len;
+                    history.push({ line: 4, i, left, right, window: {...window}, count, res: [...res], w, msg: `移动 Right 指针` });
+
+                    if (counts[w]) {
+                        window[w] = (window[w] || 0) + 1;
+                        count++;
+                        history.push({ line: 6, i, left, right, window: {...window}, count, res: [...res], w, msg: `更新窗口哈希表` });
+
+                        // 重点：无论是否超标，都展示 while 判定
+                        const isOver = window[w] > counts[w];
+                        history.push({ 
+                            line: 7, i, left, right, window: {...window}, count, res: [...res], w, 
+                            showLogic: true, winV: window[w], needV: counts[w], logicRes: isOver,
+                            msg: isOver ? `检测到超标！准备收缩左侧` : `未超标，跳过收缩逻辑`
+                        });
+
+                        while (window[w] > counts[w]) {
+                            let lw = s.substr(left, len);
+                            history.push({ line: 8, i, left, right, window: {...window}, count, res: [...res], w: lw, msg: `移除左侧单词: "${lw}"` });
+                            window[lw]--;
+                            count--;
+                            left += len;
+                            history.push({ line: 9, i, left, right, window: {...window}, count, res: [...res], w: lw, msg: `移动 Left 指针` });
+                            
+                            // 再次记录判定
+                            const stillOver = window[w] > counts[w];
+                            history.push({ 
+                                line: 7, i, left, right, window: {...window}, count, res: [...res], w, 
+                                showLogic: true, winV: window[w]||0, needV: counts[w], logicRes: stillOver,
+                                msg: stillOver ? `依然超标，继续收缩...` : `超标已修复`
+                            });
+                        }
+
+                        if (count === num) {
+                            res.push(left);
+                            history.push({ line: 11, i, left, right, window: {...window}, count, res: [...res], w, isMatch: true, msg: `✨ 匹配成功！记录索引 ${left}` });
+                        }
+                    } else {
+                        window = {}; count = 0; left = right;
+                        history.push({ line: 13, i, left, right, window: {...window}, count, res: [...res], w, msg: `无效词，重置窗口` });
+                    }
+                }
+            }
+            return history;
+        }
+
+        function render() {
+            const state = states[cur];
+            const s = document.getElementById('inputS').value;
+            const words = document.getElementById('inputWords').value.split(',').map(x => x.trim());
+            const len = words[0]?.length || 0;
+
+            // 1. 代码行高亮
+            document.querySelectorAll('#codeBlock div').forEach(el => el.classList.remove('line-active'));
+            document.getElementById(`line-${state.line}`).classList.add('line-active');
+
+            // 2. 磁带渲染
+            const tape = document.getElementById('charTape');
+            tape.innerHTML = '';
+            for (let j = 0; j < s.length; j++) {
+                const div = document.createElement('div');
+                div.className = `char-box ${(j+1)%len === 0 ? 'word-border-right' : ''}`;
+                div.innerText = s[j];
+                if (j >= state.left && j < state.right) div.classList.add('in-window');
+                if (state.isMatch && j >= state.left && j < state.right) div.classList.add('match-active');
+                // 超标高亮
+                if (state.showLogic && state.logicRes && j >= state.right - len && j < state.right) div.classList.add('overflow-active');
+                tape.appendChild(div);
+            }
+
+            // 3. 指针定位 (修正了定位基准)
+            const boxWidth = 28;
+            document.getElementById('ptrLeft').style.left = `${state.left * boxWidth}px`;
+            document.getElementById('ptrRight').style.left = `${state.right * boxWidth}px`;
+
+            // 4. 判定中心更新
+            const logicBox = document.getElementById('logicDisplay');
+            const resTag = document.getElementById('vResult');
+            if (state.showLogic) {
+                document.getElementById('vWin').innerText = state.winV;
+                document.getElementById('vNeed').innerText = state.needV;
+                logicBox.classList.replace('border-slate-700', state.logicRes ? 'border-red-500' : 'border-emerald-500');
+                resTag.innerText = state.logicRes ? "TRUE (OVERFLOW)" : "FALSE (OK)";
+                resTag.className = `text-sm font-bold py-1 px-4 rounded-full border ${state.logicRes ? 'bg-red-900 border-red-500 text-red-200' : 'bg-emerald-900 border-emerald-500 text-emerald-200'}`;
+            } else {
+                document.getElementById('vWin').innerText = "-";
+                document.getElementById('vNeed').innerText = "-";
+                logicBox.className = "flex items-center space-x-4 bg-slate-900 p-6 rounded-2xl border-2 border-slate-700 transition-all";
+                resTag.innerText = "WAITING";
+                resTag.className = "text-sm font-bold py-1 px-4 rounded-full border border-slate-600 text-slate-500 uppercase";
+            }
+
+            // 5. 监视变量
+            document.getElementById('vW').innerText = state.w ? `"${state.w}"` : `"-"`;
+            document.getElementById('vCount').innerText = `${state.count} / ${words.length}`;
+            document.getElementById('statusText').innerText = `Step ${cur}: ${state.msg}`;
+            document.getElementById('finalRes').innerText = JSON.stringify(state.res);
+            document.getElementById('stepProgress').innerText = `STEP ${cur}/${states.length - 1}`;
+
+            // 6. 哈希表对比图
+            const mapContrast = document.getElementById('mapContrast');
+            mapContrast.innerHTML = '';
+            const targetCounts = {};
+            for (let w of words) if(w) targetCounts[w] = (targetCounts[w] || 0) + 1;
+            
+            const allWords = new Set([...Object.keys(targetCounts), ...Object.keys(state.window)]);
+            allWords.forEach(w => {
+                const wc = state.window[w] || 0;
+                const tc = targetCounts[w] || 0;
+                const row = document.createElement('div');
+                row.className = "flex justify-between items-center";
+                row.innerHTML = `<span class="text-slate-400">${w}</span>
+                                 <span class="${wc > tc ? 'text-red-500' : (wc === tc ? 'text-emerald-500' : 'text-slate-300')}">
+                                    ${wc} / ${tc}
+                                 </span>`;
+                mapContrast.appendChild(row);
+            });
+        }
+
+        function next() { if (cur < states.length - 1) { cur++; render(); } else { pause(); } }
+        function prev() { if (cur > 0) { cur--; render(); } }
+        function reset() { pause(); states = generateStates(); cur = 0; render(); }
+        function togglePlay() {
+            const btn = document.getElementById('playBtn');
+            if (timer) { pause(); } else {
+                btn.innerText = "暂停";
+                btn.classList.replace('bg-blue-600', 'bg-orange-600');
+                timer = setInterval(next, 500);
+            }
+        }
+        function pause() {
+            const btn = document.getElementById('playBtn');
+            btn.innerText = "播放";
+            btn.classList.replace('bg-orange-600', 'bg-blue-600');
+            clearInterval(timer);
+            timer = null;
+        }
+
+        // 初始化
+        states = generateStates();
+        render();
+    </script>
+</body>
+</html>
